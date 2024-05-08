@@ -42,6 +42,9 @@
 *.idb
 *.pdb
 
+#Platform_IO things
+*.pio
+
 # Kernel Module Compile Results
 *.mod*
 *.cmd
