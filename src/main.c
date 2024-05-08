@@ -26,6 +26,7 @@ static uint8_t Clock;
 volatile uint8_t Out;
 
 int main(void){
+    // Configuration Things
     // Configure the system clock to 48MHz
     EPL_SystemClock_Config();
     initUART();
@@ -49,19 +50,10 @@ int main(void){
       rxb = USART2->RDR;
       
       if (rxb == 49){
-          GPIOA->BSRR |= GPIO_BSRR_BS_0 << 8;
-          GPIOA->BSRR |= GPIO_BSRR_BS_0 << 25;
-          GPIOA->BSRR |= GPIO_BSRR_BS_0 << 26;
       }
       else if (rxb == 50){
-          GPIOA->BSRR |= GPIO_BSRR_BS_0 << 24;
-          GPIOA->BSRR |= GPIO_BSRR_BS_0 << 9;
-          GPIOA->BSRR |= GPIO_BSRR_BS_0 << 26;
       }
       else {
-          GPIOA->BSRR |= GPIO_BSRR_BS_0 << 24;
-          GPIOA->BSRR |= GPIO_BSRR_BS_0 << 25;
-          GPIOA->BSRR |= GPIO_BSRR_BS_0 << 10;
       }
 
       LOG("[DEBUG-LOG]: Setting %d\r\n", rxb );
