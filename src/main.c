@@ -1,6 +1,12 @@
 #include <stm32f0xx.h>
 #include "mci_clock.h"
 #include <stdio.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "statemachine.h"
+#include "UART.h"
+//#include "epl_usart.h"
 
 
 // This is a simple macro to print debug messages of DEBUG is defined
@@ -12,137 +18,101 @@
   #define LOG( msg... ) ;
 #endif
 
-// Select the Baudrate for the UART
-#define BAUDRATE 9600
-
 // PC10 (USART3_TX) available on CN7 pin 1 to CN3 pin RX
 // PC11 (USART3_RX) available on CN7 pin 2 to CN3 pin TX
 
-void initUART();
-void delay(uint32_t time);
 
-static uint8_t Clock;
+State_Type curr_state; /* The "current state" */
+State_Type * stateptr = &curr_state;
 
-volatile uint8_t Out;
+volatile uint8_t buttonpress = 0;
+int playingfield[10*10];
+int enemy_field[10*10];
+int * pfptr;
+int * efptr;
+char stateinfo[22]={"11111111111111111111"};
+// check if state has changed
+
+State_Type laststate;
+
+//      ------------    MAIN    -------------
 
 int main(void){
-    // Configuration Things
     // Configure the system clock to 48MHz
     EPL_SystemClock_Config();
-    initUART();
-    RCC->AHBENR |= RCC_AHBENR_GPIOCEN; // Aktivierung des Clocks für GPIOC
-    RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
-    GPIOC->MODER &= ~GPIO_MODER_MODER13; //Konfiguration des Pins als Input
-    //  Activate GPIOA 8,9 & 10 as Output
-    GPIOA->MODER |= ((uint32_t) 1<<20);
-    GPIOA->MODER |= ((uint32_t) 1<<18);
-    GPIOA->MODER |= ((uint32_t) 1<<16); 
-
-    int button;
-    uint8_t rxb = 0;
-
+    // Configure UART
+    initUART2();
+    // Configure playing field
+    for(int i=0; i<100; i++){
+        playingfield[i]=0;
+        enemy_field[i]=0;
+    }
+    // infinite loop
     for(;;){
-      // Wait for the data to be received
-      while( !( USART2->ISR & USART_ISR_RXNE ) ){
-      }
-
-      // Read the data from the RX buffer
-      rxb = USART2->RDR;
-      
-      if (rxb == 49){
-      }
-      else if (rxb == 50){
-      }
-      else {
-      }
-
-      LOG("[DEBUG-LOG]: Setting %d\r\n", rxb );
-      
-     // check button press
-      button = GPIOC->IDR &= ((uint32_t) 1<<13);
-      if (button == 0) {
-        LOG("Der Knopf wird gedrueckt!! \n");
-        continue;
-      }
-
-      // State machine
-      state_table[curr_state]();
-      LOG("[DEBUG-LOG] Time: %d | Out: %d \r\n", Clock, Out );
-      delay(1000000);
-      Clock++;
+        // state function pointer
+        state_table[curr_state](stateinfo, playingfield, enemy_field, stateptr);
+        // state debug message
+        if (laststate != curr_state){
+            LOG("[DEBUG-LOG]: %d\r\n", curr_state);
+            laststate = curr_state;
+        }
     }
 }
 
-void stateA(void){
-  if( Clock == 2 ) { /* Change State? */
-    curr_state = STATE_B; /* Next State */
-    Out=1;
-  }
-}
+// ------------------   END MAIN    -------------
 
-
-void stateB(void){
-  if( Clock == 5 ) { /* Change State? */
-    curr_state = STATE_C; /* Next State */
-    Out=2;
-  }
-}
-void stateC(void){
-  if( Clock == 9 ) { /* Change State? */
-	Clock = 0;
-	curr_state = STATE_A; /* Next State */
-	Out=0;
-  }
-}
-void initializeSM(void)
+void EXTI4_15_IRQHandler(void) // Interrupt function
 {
-  curr_state = STATE_A;
-  Out=0;
-  Clock = 1;
-}
-
-
-
-
-
-
-void initUART(){
-     // Enable peripheral  GPIOA clock
-    RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
-    // Enable peripheral  USART2 clock
-    RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
-
-    // Configure PA2 as USART2_TX using alternate function 1
-    GPIOA->MODER |= GPIO_MODER_MODER2_1;
-    GPIOA->AFR[0] |= 0b0001 << (4*2);
-
-
-    // Configure PA3 as USART2_RX using alternate function 1
-    GPIOA->MODER |= GPIO_MODER_MODER3_1;
-    GPIOA->AFR[0] |= 0b0001 << (4*3);
-
-    // Configure the UART Baude rate Register 
-    USART2->BRR = (APB_FREQ / BAUDRATE);
-    // Enable the UART using the CR1 register
-    USART2->CR1 |= ( USART_CR1_RE | USART_CR1_TE | USART_CR1_UE );
-}
-
-
-/**
- * @brief Delays the program execution for a specified amount of time.
- * @param time The amount of time to delay in number of cycles.
- * @return 0 when the delay is completed.
- */
-void delay(uint32_t time){
-    for(uint32_t i = 0; i < time; i++ ){
-        asm("nop"); // No operation, used for delaying
+  if (buttonpress == 0){
+     buttonpress=1;
+     curr_state=STARTS1;
     }
-    return 0;
+  if (EXTI->PR & (1 << 13)) {
+    // Clear the EXTI status flag.
+    // Put a breakpoint here and check the value of the flag.
+    EXTI->PR |= (1 << 13); 
+  } 
+}
+
+void readUART2(char ** msg){
+    /* Receives one character at a time
+     *
+     * */
+    int count = 0;
+    char endchar = '\n';
+    char * msgdata = (char *) malloc(sizeof(char));
+    while (1){
+        // wait for UART Data
+        while(!(USART2->ISR & USART_ISR_RXNE)){
+        }
+        // Read the data from the RX buffer
+        msgdata = (char *) realloc(msgdata, count+1+sizeof(char));
+        msgdata[count] = USART2->RDR;
+        // check if
+        if(msgdata[count]==endchar){break;}
+        if (count == 30) { // Prevent overflow
+            break;
+        }
+        count++;
+    }
+    msgdata[count]='\0'; // finish msg string with \0
+    *msg = msgdata;
 }
 
 
+void USART2_IRQHandler( void ){
+    /*
+    if ( USART2->ISR & USART_ISR_RXNE ) {
+        uint8_t c = USART2->RDR;
+        addchar(c, lastmsg, count, lstateinfo);
+    }
+    */
+    //readUART2(&stateinfo);
+    curr_state = GAMEEND;
+}
 
-// For supporting printf function we override the _write function to redirect the output to UART
+
+// To support printf redirect output to UART
 int _write( int handle, char* data, int size ) {
     int count = size;
     while( count-- ) {
