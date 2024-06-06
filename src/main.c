@@ -8,7 +8,6 @@
 #include "UART.h"
 //#include "epl_usart.h"
 
-
 // This is a simple macro to print debug messages of DEBUG is defined
 #define DEBUG
 
@@ -30,7 +29,8 @@ int playingfield[10*10];
 int enemy_field[10*10];
 int * pfptr;
 int * efptr;
-char stateinfo[22]={"11111111111111111111"};
+char * stateinfo="11111111111111111111";
+char ** si = &stateinfo;
 // check if state has changed
 
 State_Type laststate;
@@ -53,7 +53,7 @@ int main(void){
         state_table[curr_state](stateinfo, playingfield, enemy_field, stateptr);
         // state debug message
         if (laststate != curr_state){
-            LOG("[DEBUG-LOG]: %d\r\n", curr_state);
+            //LOG("[DEBUG-LOG]: %d\r\n", curr_state);
             laststate = curr_state;
         }
     }
@@ -75,9 +75,7 @@ void EXTI4_15_IRQHandler(void) // Interrupt function
 }
 
 void readUART2(char ** msg){
-    /* Receives one character at a time
-     *
-     * */
+    // Receives one character at a time
     int count = 0;
     char endchar = '\n';
     char * msgdata = (char *) malloc(sizeof(char));
@@ -96,19 +94,20 @@ void readUART2(char ** msg){
         count++;
     }
     msgdata[count]='\0'; // finish msg string with \0
+    printf("RECEIVED; %s \n", msgdata);
     *msg = msgdata;
 }
 
 
-void USART2_IRQHandler( void ){
+void USART2_IRQHandler(void){
+    //LOG("Received char\n"); // Add debug print
     /*
     if ( USART2->ISR & USART_ISR_RXNE ) {
         uint8_t c = USART2->RDR;
         addchar(c, lastmsg, count, lstateinfo);
     }
     */
-    //readUART2(&stateinfo);
-    curr_state = GAMEEND;
+    readUART2(si);
 }
 
 

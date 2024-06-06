@@ -65,7 +65,7 @@ void startS2_(char *info, int *pf, int *ef, State_Type * curr_state){ // coming 
     // info should contain the Start message as received by the interrupt
     if(info[0]!='1'){
         // store enemy field from checksum
-        printf("START_MESSAGE_RECEIVED"); 
+        printf("SSSSSSSSSSSSTTTTTTTTTTTTTTTTAAAAAAAAAAAAATTTTTTTTTTTTEEEEEEEE"); 
         // generate playingfield
 
         // send checksum 
